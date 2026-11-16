@@ -188,6 +188,38 @@ def search_character():
     })
 
 
+@app.get("/api/ranking")
+def character_ranking():
+    data = load_data()
+    latest_by_name = {}
+    for name, history in data.items():
+        if not isinstance(history, list):
+            continue
+        valid = [
+            row for row in history
+            if isinstance(row, dict)
+            and isinstance(row.get("combatPower"), (int, float))
+            and row["combatPower"] >= 0
+        ]
+        if not valid:
+            continue
+        latest = max(valid, key=lambda row: str(row.get("date", "")))
+        latest_by_name[name] = {
+            "name": latest.get("name") or name,
+            "className": latest.get("className") or "알 수 없음",
+            "server": latest.get("server") or "알 수 없음",
+            "combatPower": latest["combatPower"],
+            "itemLevel": latest.get("itemLevel", 0),
+            "date": latest.get("date", ""),
+        }
+    ranking = sorted(
+        latest_by_name.values(), key=lambda row: row["combatPower"], reverse=True
+    )
+    for rank, row in enumerate(ranking, 1):
+        row["rank"] = rank
+    return jsonify({"status": 200, "ranking": ranking[:20]})
+
+
 @app.errorhandler(ApiError)
 def handle_api_error(error):
     return jsonify({"status": error.status, "message": error.message}), error.status

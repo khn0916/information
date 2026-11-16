@@ -25,16 +25,28 @@ main{flex:1;display:flex;flex-direction:column;align-items:center;justify-conten
 .search-title{font-size:2.2rem;font-weight:700;margin-bottom:40px;letter-spacing:-1px;}
 .search-title span{color:var(--accent-gold);text-shadow:0 0 20px var(--accent-glow);}
 .search-box{position:relative;width:100%;margin-bottom:25px;}
-.search-box input{width:100%;padding:22px 35px;font-size:1.25rem;background-color:var(--panel-bg);border:1px solid rgba(255,255,255,0.1);border-radius:50px;color:var(--text-main);outline:none;transition:all 0.4s cubic-bezier(0.4,0,0.2,1);box-shadow:inset 0 2px 4px rgba(0,0,0,0.3),0 10px 30px rgba(0,0,0,0.5);backdrop-filter:blur(10px);}
+.search-box input{width:100%;padding:22px 112px 22px 35px;font-size:1.25rem;background-color:var(--panel-bg);border:1px solid rgba(255,255,255,0.1);border-radius:50px;color:var(--text-main);outline:none;transition:all 0.4s cubic-bezier(0.4,0,0.2,1);box-shadow:inset 0 2px 4px rgba(0,0,0,0.3),0 10px 30px rgba(0,0,0,0.5);backdrop-filter:blur(10px);}
 .search-box input::placeholder{color:#64748B;}
 .search-box input:focus{border-color:var(--accent-gold);background-color:rgba(30,35,45,0.9);box-shadow:inset 0 2px 4px rgba(0,0,0,0.3),0 0 30px rgba(212,175,55,0.15);}
 .search-btn{position:absolute;right:18px;top:50%;transform:translateY(-50%);background:none;border:none;color:#64748B;cursor:pointer;padding:10px;display:flex;align-items:center;justify-content:center;transition:all 0.3s ease;border-radius:50%;}
 .search-btn svg{width:24px;height:24px;stroke-width:2.5;}
 .search-box input:focus + .search-btn,.search-btn:hover{color:var(--accent-gold);filter:drop-shadow(0 0 8px var(--accent-glow));}
-.menu-tabs{display:flex;justify-content:center;gap:20px;margin-top:30px;border-top:1px solid rgba(255,255,255,0.05);padding-top:25px;}
-.menu-tabs button{background:none;border:none;color:var(--text-sub);font-size:1.05rem;font-weight:600;cursor:pointer;padding:8px 16px;transition:all 0.3s ease;position:relative;}
-.menu-tabs button.active{color:var(--accent-gold);}
-.menu-tabs button.active::after{content:'';position:absolute;bottom:-26px;left:0;width:100%;height:2px;background:linear-gradient(90deg,transparent,var(--accent-gold),transparent);box-shadow:0 0 10px var(--accent-gold);}
+.home-layout{width:min(1200px,100%);display:grid;grid-template-columns:minmax(0,1fr) 320px;align-items:center;gap:32px;}
+.home-layout main{min-width:0;}
+.favorite-btn{position:absolute;right:62px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--text-sub);font-size:1.7rem;line-height:1;cursor:pointer;padding:8px;border-radius:50%;}
+.favorite-btn:hover,.favorite-btn.active{color:var(--accent-gold);filter:drop-shadow(0 0 8px var(--accent-glow));}
+.ranking-panel{width:100%;max-height:min(70vh,620px);overflow:auto;padding:20px;}
+.ranking-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.ranking-heading h2{font-size:1.15rem;}
+.ranking-refresh{border:0;background:none;color:var(--text-sub);cursor:pointer;font-size:1.2rem;padding:5px;}
+.ranking-list{list-style:none;display:flex;flex-direction:column;gap:8px;}
+.ranking-item{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:center;padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;border-radius:8px;}
+.ranking-item:hover{background:rgba(255,255,255,.05);}
+.ranking-rank{color:var(--accent-gold);font-weight:800;text-align:center;}
+.ranking-name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ranking-meta{display:block;color:var(--text-sub);font-size:.76rem;margin-top:3px;}
+.ranking-power{font-size:.84rem;font-weight:700;white-space:nowrap;}
+.ranking-note{color:var(--text-sub);font-size:.82rem;line-height:1.5;margin-top:12px;}
 .result-header{padding:30px 50px;display:flex;align-items:center;gap:20px;}
 .btn-back{background:var(--panel-bg);border:1px solid rgba(255,255,255,0.1);color:var(--text-main);padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:bold;transition:0.2s;}
 .btn-back:hover{background:rgba(255,255,255,0.1);}
@@ -105,7 +117,7 @@ body{height:100dvh;min-height:320px}
 .dashboard-grid{grid-template-columns:320px minmax(0,1fr)}
 .right-column,.loa-eq-column{min-width:0}
 .graph-panel{flex-shrink:0}
-.search-box input{padding-right:70px}
+.search-box input{padding-right:112px}
 .search-btn:disabled{cursor:wait;opacity:.6}
 .char-nickname,.char-stat-value{overflow-wrap:anywhere}
 .char-image img{width:100%;height:100%;object-fit:contain;border-radius:12px}
@@ -114,7 +126,7 @@ body{height:100dvh;min-height:320px}
 .chart-line{pointer-events:none}
 .chart-dot:focus{outline:none;fill:var(--accent-gold);r:7}
 .empty-state{color:var(--text-sub);text-align:center;padding:15px}
-@media(max-width:760px){header,.result-header{padding:24px 20px}.result-container{padding:0 16px 24px}.dashboard-grid{grid-template-columns:1fr;gap:20px}.char-image{max-width:260px}.search-title{font-size:1.8rem}.menu-tabs{gap:4px}.menu-tabs button{padding:8px}.site-title{font-size:1.1rem}.datetime-display{font-size:.75rem}.datetime-display .time{font-size:1.3rem}.graph-header{gap:8px;flex-wrap:wrap}.right-column{gap:20px}}
+@media(max-width:760px){header,.result-header{padding:24px 20px}.result-container{padding:0 16px 24px}.dashboard-grid{grid-template-columns:1fr;gap:20px}.char-image{max-width:260px}.search-title{font-size:1.8rem}.site-title{font-size:1.1rem}.datetime-display{font-size:.75rem}.datetime-display .time{font-size:1.3rem}.graph-header{gap:8px;flex-wrap:wrap}.right-column{gap:20px}.home-layout{grid-template-columns:1fr;gap:24px;padding:0 20px}.home-layout main{margin-top:0;min-height:36vh}.ranking-panel{max-height:40vh}}
 @media(max-width:420px){.loa-eq-container{flex-direction:column}.error-modal{padding:24px;gap:12px}.error-icon-box{width:50px;height:50px}}
 </style>
 </head>
@@ -127,11 +139,13 @@ body{height:100dvh;min-height:320px}
 <div class="time" id="timeText">00:00:00</div>
 </div>
 </header>
+<div class="home-layout">
 <main>
 <div class="search-container">
-<div class="search-title">나의 <span>전투력</span>을 기록하세요</div>
+<div class="search-title"><span>SoLOA</span></div>
 <div class="search-box">
 <input type="text" aria-label="캐릭터 이름" id="charInput" placeholder="원하는 캐릭터의 이름을 입력하세요." autocomplete="off">
+<button class="favorite-btn" id="favoriteBtn" type="button" aria-label="즐겨찾기 추가" title="즐겨찾기">☆</button>
 <button class="search-btn" id="searchBtn" aria-label="캐릭터 검색">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
 <circle cx="11" cy="11" r="8"></circle>
@@ -139,13 +153,14 @@ body{height:100dvh;min-height:320px}
 </svg>
 </button>
 </div>
-<div class="menu-tabs">
-<button class="active">전투력 기록</button>
-<button>전체 랭킹</button>
-<button>즐겨찾기</button>
-</div>
 </div>
 </main>
+<aside class="panel ranking-panel" aria-labelledby="rankingTitle">
+<div class="ranking-heading"><h2 id="rankingTitle">전체 랭킹</h2><button class="ranking-refresh" id="rankingRefresh" type="button" aria-label="랭킹 새로고침" title="새로고침">↻</button></div>
+<ol class="ranking-list" id="rankingList"><li class="empty-state">랭킹을 불러오는 중...</li></ol>
+<p class="ranking-note" id="rankingNote">검색해 기록된 캐릭터의 최신 전투력 순위입니다.</p>
+</aside>
+</div>
 </div>
 <div id="resultScreen" class="screen">
 <div class="result-header">
@@ -249,6 +264,7 @@ const apiBase = (
 
 const button = $('searchBtn');
 const input = $('charInput');
+const favoriteButton = $('favoriteBtn');
 const modal = $('errorModal');
 const svg = $('chartSvg');
 const tooltip = $('chartTooltip');
@@ -258,6 +274,78 @@ document.body.append(tooltip);
 
 let busy = false;
 let previousFocus;
+const FAVORITES_KEY = 'soloa-favorites-v1';
+
+function getFavorites() {
+  try {
+    const value = JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]');
+    return Array.isArray(value) ? value.filter(name => typeof name === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function updateFavoriteButton() {
+  const name = input.value.trim();
+  const saved = name && getFavorites().includes(name);
+  favoriteButton.textContent = saved ? '★' : '☆';
+  favoriteButton.classList.toggle('active', Boolean(saved));
+  favoriteButton.setAttribute('aria-label', saved ? '즐겨찾기 해제' : '즐겨찾기 추가');
+  favoriteButton.title = saved ? '즐겨찾기 해제' : '즐겨찾기 추가';
+}
+
+function toggleFavorite() {
+  const name = input.value.trim();
+  if (!name) return showError('즐겨찾기', '캐릭터 이름을 먼저 입력해주세요.');
+  const favorites = getFavorites();
+  const index = favorites.indexOf(name);
+  if (index >= 0) favorites.splice(index, 1);
+  else favorites.push(name);
+  try {
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+    updateFavoriteButton();
+  } catch {
+    showError('저장 오류', '브라우저에 즐겨찾기를 저장하지 못했습니다.');
+  }
+}
+
+async function loadRanking() {
+  const list = $('rankingList');
+  list.replaceChildren(node('li', 'empty-state', '랭킹을 불러오는 중...'));
+  try {
+    const response = await fetch(`${apiBase}/api/ranking`);
+    const data = await response.json();
+    if (!response.ok || !Array.isArray(data.ranking)) throw new Error();
+    list.replaceChildren();
+    if (!data.ranking.length) {
+      list.append(node('li', 'empty-state', '아직 기록된 캐릭터가 없습니다.'));
+      return;
+    }
+    for (const row of data.ranking) {
+      const item = node('li', 'ranking-item');
+      item.tabIndex = 0;
+      item.setAttribute('role', 'button');
+      item.append(node('span', 'ranking-rank', row.rank));
+      const name = node('span', 'ranking-name', row.name);
+      name.append(node('small', 'ranking-meta', `${row.className} · ${row.server}`));
+      item.append(name, node('span', 'ranking-power', format(row.combatPower)));
+      const choose = () => { input.value = row.name; updateFavoriteButton(); searchCharacter(); };
+      item.addEventListener('click', choose);
+      item.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(); }
+      });
+      list.append(item);
+    }
+  } catch {
+    list.replaceChildren(node('li', 'empty-state', '랭킹을 불러오지 못했습니다.'));
+  }
+}
+
+favoriteButton.addEventListener('click', toggleFavorite);
+input.addEventListener('input', updateFavoriteButton);
+$('rankingRefresh').addEventListener('click', loadRanking);
+updateFavoriteButton();
+loadRanking();
 
 function updateTime() {
   const now = new Date();
@@ -447,6 +535,7 @@ async function searchCharacter() {
     $('resultScreen').classList.add('active');
 
     drawChart(data.history);
+    loadRanking();
     $('btnBack').focus();
   } catch (error) {
     showError(
