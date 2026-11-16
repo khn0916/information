@@ -32,6 +32,11 @@ def health():
     return jsonify({"status": "ok"})
 
 
+@app.get("/tear.png")
+def error_image():
+    return send_from_directory(BASE_DIR, "tear.png")
+
+
 def load_env_file():
     """Load local .env values without overriding explicitly set environment variables."""
     env_file = BASE_DIR / ".env"
