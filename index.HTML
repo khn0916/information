@@ -24,13 +24,19 @@ main{flex:1;display:flex;flex-direction:column;align-items:center;justify-conten
 .search-container{width:100%;max-width:680px;text-align:center;}
 .search-title{font-size:2.2rem;font-weight:700;margin-bottom:40px;letter-spacing:-1px;}
 .search-title span{font-family:Georgia,'Times New Roman',serif;font-weight:800;letter-spacing:.04em;color:#f8e7a0;background:linear-gradient(180deg,#fff9d9 0%,#f7df91 18%,#fff3bf 30%,#c58b2a 52%,#f4d77d 68%,#8d5b1c 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 1px 0 rgba(255,245,190,.9)) drop-shadow(0 2px 0 #80531d);}
-.search-box{position:relative;width:100%;margin-bottom:25px;}
+.search-box{position:relative;z-index:2;width:100%;margin-bottom:25px;}
 .search-box input{width:100%;padding:22px 112px 22px 35px;font-size:1.25rem;background-color:var(--panel-bg);border:1px solid rgba(255,255,255,0.1);border-radius:50px;color:var(--text-main);outline:none;transition:all 0.4s cubic-bezier(0.4,0,0.2,1);box-shadow:inset 0 2px 4px rgba(0,0,0,0.3),0 10px 30px rgba(0,0,0,0.5);backdrop-filter:blur(10px);}
 .search-box input::placeholder{color:#64748B;}
 .search-box input:focus{border-color:var(--accent-gold);background-color:rgba(30,35,45,0.9);box-shadow:inset 0 2px 4px rgba(0,0,0,0.3),0 0 30px rgba(212,175,55,0.15);}
 .search-btn{position:absolute;right:18px;top:50%;transform:translateY(-50%);background:none;border:none;color:#64748B;cursor:pointer;padding:10px;display:flex;align-items:center;justify-content:center;transition:all 0.3s ease;border-radius:50%;}
 .search-btn svg{width:24px;height:24px;stroke-width:2.5;}
 .search-box input:focus + .search-btn,.search-btn:hover{color:var(--accent-gold);filter:drop-shadow(0 0 8px var(--accent-glow));}
+.favorite-dropdown{position:absolute;top:calc(100% + 10px);left:0;right:0;max-height:min(38vh,320px);overflow-y:auto;padding:10px;background:rgba(22,27,37,.97);border:1px solid rgba(255,255,255,.12);border-radius:14px;box-shadow:0 14px 35px rgba(0,0,0,.45);backdrop-filter:blur(12px);text-align:left;z-index:30;}
+.favorite-dropdown[hidden]{display:none;}
+.favorite-dropdown-heading{padding:8px 12px 10px;color:var(--accent-gold);font-size:.9rem;font-weight:700;border-bottom:1px solid rgba(255,255,255,.07);}
+.favorite-option{display:block;width:100%;padding:11px 12px;border:0;border-radius:8px;background:transparent;color:var(--text-main);text-align:left;font:inherit;cursor:pointer;}
+.favorite-option:hover,.favorite-option:focus{background:rgba(255,255,255,.07);outline:none;color:#f8e7a0;}
+.favorite-empty{padding:12px;color:var(--text-sub);font-size:.9rem;}
 .home-layout{position:relative;flex:1;min-height:0;width:100%;display:block;}
 .home-layout main{position:absolute;inset:0;display:flex;width:100%;min-width:0;margin:0;padding:0 20px 18vh;align-items:center;justify-content:center;}
 .favorite-btn{position:absolute;right:10px;top:10px;z-index:1;width:42px;height:42px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.14);border-radius:50%;background:rgba(11,14,20,.72);color:var(--text-sub);font-size:1.7rem;line-height:1;cursor:pointer;backdrop-filter:blur(6px);}
@@ -149,13 +155,14 @@ body{height:100dvh;min-height:320px}
 <div class="search-container">
 <div class="search-title"><span>SoLOA</span></div>
 <div class="search-box">
-<input type="text" aria-label="캐릭터 이름" id="charInput" placeholder="원하는 캐릭터의 이름을 입력하세요." autocomplete="off">
+<input type="text" aria-label="캐릭터 이름" id="charInput" placeholder="원하는 캐릭터의 이름을 입력하세요." autocomplete="off" aria-controls="favoriteDropdown" aria-expanded="false">
 <button class="search-btn" id="searchBtn" aria-label="캐릭터 검색">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
 <circle cx="11" cy="11" r="8"></circle>
 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
 </svg>
 </button>
+<div class="favorite-dropdown" id="favoriteDropdown" role="group" aria-label="즐겨찾기한 캐릭터" hidden></div>
 </div>
 </div>
 </main>
@@ -270,6 +277,7 @@ const apiBase = (
 
 const button = $('searchBtn');
 const input = $('charInput');
+const favoriteDropdown = $('favoriteDropdown');
 const favoriteButton = $('favoriteBtn');
 const modal = $('errorModal');
 const svg = $('chartSvg');
@@ -291,6 +299,38 @@ function getFavorites() {
   } catch {
     return [];
   }
+}
+
+function closeFavoriteDropdown() {
+  favoriteDropdown.hidden = true;
+  input.setAttribute('aria-expanded', 'false');
+}
+
+function renderFavoriteDropdown() {
+  const favorites = getFavorites();
+  const query = input.value.trim().toLocaleLowerCase();
+  const matches = favorites.filter(name => name.toLocaleLowerCase().includes(query));
+  favoriteDropdown.replaceChildren();
+  if (!favorites.length) return closeFavoriteDropdown();
+
+  favoriteDropdown.append(node('div', 'favorite-dropdown-heading', '☆ 즐겨찾기'));
+  if (!matches.length) {
+    favoriteDropdown.append(node('div', 'favorite-empty', '일치하는 즐겨찾기가 없습니다.'));
+  } else {
+    for (const name of matches) {
+      const option = node('button', 'favorite-option', name);
+      option.type = 'button';
+      option.addEventListener('mousedown', event => event.preventDefault());
+      option.addEventListener('click', () => {
+        input.value = name;
+        closeFavoriteDropdown();
+        searchCharacter();
+      });
+      favoriteDropdown.append(option);
+    }
+  }
+  favoriteDropdown.hidden = false;
+  input.setAttribute('aria-expanded', 'true');
 }
 
 function updateFavoriteButton() {
@@ -387,6 +427,20 @@ async function registerRankingCharacter() {
 favoriteButton.addEventListener('click', toggleFavorite);
 $('rankingRefresh').addEventListener('click', loadRanking);
 $('btnRankRegister').addEventListener('click', registerRankingCharacter);
+input.addEventListener('focus', renderFavoriteDropdown);
+input.addEventListener('click', renderFavoriteDropdown);
+input.addEventListener('input', renderFavoriteDropdown);
+input.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !favoriteDropdown.hidden) {
+    closeFavoriteDropdown();
+  }
+});
+document.addEventListener('pointerdown', event => {
+  if (!event.target.closest('.search-box')) closeFavoriteDropdown();
+});
+document.addEventListener('focusin', event => {
+  if (!event.target.closest('.search-box')) closeFavoriteDropdown();
+});
 updateFavoriteButton();
 loadRanking();
 
@@ -506,6 +560,7 @@ function renderEquipment(equipment) {
 
 async function searchCharacter() {
   if (busy || modal.classList.contains('show')) return;
+  closeFavoriteDropdown();
 
   const name = input.value.trim();
 
