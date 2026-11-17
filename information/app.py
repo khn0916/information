@@ -16,7 +16,7 @@ from psycopg.rows import dict_row
 
 app = Flask(__name__)
 app.json.ensure_ascii = False
-CORS(app, origins=os.getenv("CORS_ORIGINS", "null,http://127.0.0.1:5000").split(","))
+CORS(app, origins={origin.strip() for origin in os.getenv("CORS_ORIGINS", "null,http://127.0.0.1:5000").split(",")} | {"https://khn0916.github.io"})
 logging.basicConfig(level=logging.INFO)
 log = app.logger
 
