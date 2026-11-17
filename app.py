@@ -9,6 +9,8 @@ from urllib.parse import quote
 import requests
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
+import psycopg
+from psycopg.rows import dict_row
 
 app = Flask(__name__)
 app.json.ensure_ascii = False
@@ -18,6 +20,7 @@ log = app.logger
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_FILE = Path(os.getenv("LOA_DATA_FILE", BASE_DIR / "loa_data.json"))
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 API_URL = "https://developer-lostark.game.onstove.com/armories/characters/{}/{}"
 TIMEOUT = (5, 15)
 
@@ -135,6 +138,62 @@ def save_data(data):
             temp_path.unlink(missing_ok=True)
 
 
+def ranking_connection():
+    if not DATABASE_URL:
+        raise ApiError("랭킹 저장소 연결이 필요합니다.", 503)
+    connection = None
+    try:
+        connection = psycopg.connect(
+            DATABASE_URL, row_factory=dict_row, connect_timeout=10
+        )
+        connection.execute(
+            """CREATE TABLE IF NOT EXISTS ranking_characters (
+                name TEXT NOT NULL,
+                server TEXT NOT NULL,
+                class_name TEXT NOT NULL,
+                combat_power DOUBLE PRECISION NOT NULL CHECK (combat_power >= 0),
+                item_level DOUBLE PRECISION NOT NULL DEFAULT 0,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                PRIMARY KEY (server, name)
+            )"""
+        )
+        return connection
+    except psycopg.Error as exc:
+        if connection is not None:
+            connection.close()
+        log.exception("Unable to connect to the ranking database")
+        raise ApiError("랭킹 저장소에 연결하지 못했습니다.", 503) from exc
+
+
+def search_history_ranking():
+    data = load_data()
+    latest_by_name = {}
+    for name, history in data.items():
+        if not isinstance(history, list):
+            continue
+        valid = [
+            row for row in history
+            if isinstance(row, dict)
+            and isinstance(row.get("combatPower"), (int, float))
+            and row["combatPower"] >= 0
+        ]
+        if not valid:
+            continue
+        latest = max(valid, key=lambda row: str(row.get("date", "")))
+        latest_by_name[name] = {
+            "name": latest.get("name") or name,
+            "className": latest.get("className") or "알 수 없음",
+            "server": latest.get("server") or "알 수 없음",
+            "combatPower": latest["combatPower"],
+        }
+    ranking = sorted(
+        latest_by_name.values(), key=lambda row: row["combatPower"], reverse=True
+    )[:10]
+    for rank, row in enumerate(ranking, 1):
+        row["rank"] = rank
+    return ranking
+
+
 @app.get("/api/search")
 def search_character():
     char_name = request.args.get("name", "").strip()
@@ -190,34 +249,81 @@ def search_character():
 
 @app.get("/api/ranking")
 def character_ranking():
-    data = load_data()
-    latest_by_name = {}
-    for name, history in data.items():
+    if not DATABASE_URL:
+        return jsonify({
+            "status": 200,
+            "ranking": search_history_ranking(),
+            "registrationEnabled": False,
+        })
+    try:
+        with ranking_connection() as connection:
+            ranking = connection.execute(
+                """SELECT name, server, class_name AS \"className\", combat_power AS \"combatPower\"
+                   FROM ranking_characters
+                   ORDER BY combat_power DESC, name ASC
+                   LIMIT 10"""
+            ).fetchall()
+    except psycopg.Error as exc:
+        log.exception("Unable to load character ranking")
+        raise ApiError("랭킹을 불러오지 못했습니다.", 503) from exc
+    for rank, row in enumerate(ranking, 1):
+        row["rank"] = rank
+    return jsonify({"status": 200, "ranking": ranking, "registrationEnabled": True})
+
+
+@app.post("/api/ranking/register")
+def register_ranking_character():
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict):
+        raise ApiError("캐릭터 이름을 확인해주세요.", 400)
+    char_name = payload.get("name", "")
+    if not isinstance(char_name, str) or not char_name.strip() or len(char_name.strip()) > 32:
+        raise ApiError("캐릭터 이름을 확인해주세요.", 400)
+    char_name = char_name.strip()
+    if not DATABASE_URL:
+        raise ApiError("랭킹 저장소 연결이 필요합니다.", 503)
+
+    matches = []
+    for history in load_data().values():
         if not isinstance(history, list):
             continue
         valid = [
             row for row in history
             if isinstance(row, dict)
+            and str(row.get("name", "")).casefold() == char_name.casefold()
             and isinstance(row.get("combatPower"), (int, float))
             and row["combatPower"] >= 0
         ]
-        if not valid:
-            continue
-        latest = max(valid, key=lambda row: str(row.get("date", "")))
-        latest_by_name[name] = {
-            "name": latest.get("name") or name,
-            "className": latest.get("className") or "알 수 없음",
-            "server": latest.get("server") or "알 수 없음",
-            "combatPower": latest["combatPower"],
-            "itemLevel": latest.get("itemLevel", 0),
-            "date": latest.get("date", ""),
-        }
-    ranking = sorted(
-        latest_by_name.values(), key=lambda row: row["combatPower"], reverse=True
-    )
-    for rank, row in enumerate(ranking, 1):
-        row["rank"] = rank
-    return jsonify({"status": 200, "ranking": ranking[:20]})
+        if valid:
+            matches.append(max(valid, key=lambda row: str(row.get("date", ""))))
+    if not matches:
+        raise ApiError("먼저 캐릭터를 검색한 뒤 랭킹에 등록해주세요.", 400)
+    latest = max(matches, key=lambda row: str(row.get("date", "")))
+
+    entry = {
+        "name": latest["name"],
+        "server": latest.get("server") or "알 수 없음",
+        "class_name": latest.get("className") or "알 수 없음",
+        "combat_power": float(latest["combatPower"]),
+        "item_level": float(latest.get("itemLevel") or 0),
+    }
+    try:
+        with ranking_connection() as connection:
+            connection.execute(
+                """INSERT INTO ranking_characters
+                       (name, server, class_name, combat_power, item_level)
+                   VALUES (%(name)s, %(server)s, %(class_name)s, %(combat_power)s, %(item_level)s)
+                   ON CONFLICT (server, name) DO UPDATE SET
+                       class_name = EXCLUDED.class_name,
+                       combat_power = EXCLUDED.combat_power,
+                       item_level = EXCLUDED.item_level,
+                       updated_at = now()""",
+                entry,
+            )
+    except psycopg.Error as exc:
+        log.exception("Unable to register character in ranking")
+        raise ApiError("랭킹 등록을 저장하지 못했습니다.", 503) from exc
+    return jsonify({"status": 200, "message": "랭킹에 등록했습니다.", "character": entry})
 
 
 @app.errorhandler(ApiError)

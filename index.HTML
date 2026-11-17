@@ -48,6 +48,11 @@ main{flex:1;display:flex;flex-direction:column;align-items:center;justify-conten
 .ranking-power{font-size:.84rem;font-weight:700;white-space:nowrap;}
 .ranking-note{color:var(--text-sub);font-size:.82rem;line-height:1.5;margin-top:12px;}
 .result-header{padding:30px 50px;display:flex;align-items:center;gap:20px;}
+.result-actions{margin-left:auto;display:flex;align-items:center;gap:12px;}
+.btn-rank-register{padding:10px 16px;border:1px solid rgba(212,175,55,.55);border-radius:8px;background:rgba(212,175,55,.12);color:#f8e7a0;font-weight:700;cursor:pointer;}
+.btn-rank-register:hover:not(:disabled){background:rgba(212,175,55,.22);}
+.btn-rank-register:disabled{opacity:.55;cursor:wait;}
+.ranking-registration-status{color:var(--text-sub);font-size:.85rem;}
 .btn-back{background:var(--panel-bg);border:1px solid rgba(255,255,255,0.1);color:var(--text-main);padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:bold;transition:0.2s;}
 .btn-back:hover{background:rgba(255,255,255,0.1);}
 .result-container{flex:1;padding:0 50px 40px 50px;overflow-y:auto;max-width:1400px;margin:0 auto;width:100%;}
@@ -126,7 +131,7 @@ body{height:100dvh;min-height:320px}
 .chart-line{pointer-events:none}
 .chart-dot:focus{outline:none;fill:var(--accent-gold);r:7}
 .empty-state{color:var(--text-sub);text-align:center;padding:15px}
-@media(max-width:760px){header,.result-header{padding:24px 20px}.result-container{padding:0 16px 24px}.dashboard-grid{grid-template-columns:1fr;gap:20px}.char-image{max-width:260px}.search-title{font-size:1.8rem}.site-title{font-size:1.1rem}.datetime-display{font-size:.75rem}.datetime-display .time{font-size:1.3rem}.graph-header{gap:8px;flex-wrap:wrap}.right-column{gap:20px}.home-layout{display:flex;flex-direction:column;align-items:center;gap:20px;padding:0 20px 24px}.home-layout main{position:relative;inset:auto;width:100%;min-height:36vh;flex:none;padding:0 20px}.ranking-panel{position:relative;inset:auto;transform:none;width:min(100%,420px);max-height:40vh;flex:none}}
+@media(max-width:760px){header,.result-header{padding:24px 20px}.result-header{flex-wrap:wrap}.result-actions{gap:6px;flex-wrap:wrap;justify-content:flex-end}.ranking-registration-status{font-size:.72rem}.result-container{padding:0 16px 24px}.dashboard-grid{grid-template-columns:1fr;gap:20px}.char-image{max-width:260px}.search-title{font-size:1.8rem}.site-title{font-size:1.1rem}.datetime-display{font-size:.75rem}.datetime-display .time{font-size:1.3rem}.graph-header{gap:8px;flex-wrap:wrap}.right-column{gap:20px}.home-layout{display:flex;flex-direction:column;align-items:center;gap:20px;padding:0 20px 24px}.home-layout main{position:relative;inset:auto;width:100%;min-height:36vh;flex:none;padding:0 20px}.ranking-panel{position:relative;inset:auto;transform:none;width:min(100%,420px);max-height:40vh;flex:none}}
 @media(max-width:420px){.loa-eq-container{flex-direction:column}.error-modal{padding:24px;gap:12px}.error-icon-box{width:50px;height:50px}}
 </style>
 </head>
@@ -158,13 +163,14 @@ body{height:100dvh;min-height:320px}
 <aside class="panel ranking-panel" aria-labelledby="rankingTitle">
 <div class="ranking-heading"><h2 id="rankingTitle">전투력 TOP 10</h2><button class="ranking-refresh" id="rankingRefresh" type="button" aria-label="랭킹 새로고침" title="새로고침">↻</button></div>
 <ol class="ranking-list" id="rankingList"><li class="empty-state">랭킹을 불러오는 중...</li></ol>
-<p class="ranking-note" id="rankingNote">검색해 기록된 캐릭터 중 전투력이 높은 10명입니다.</p>
+<p class="ranking-note" id="rankingNote">캐릭터를 검색한 뒤 직접 등록해 참여하세요. 캐릭터 소유자 확인은 제공하지 않습니다.</p>
 </aside>
 </div>
 </div>
 <div id="resultScreen" class="screen">
 <div class="result-header">
 <button class="btn-back" id="btnBack">← 돌아가기</button>
+<div class="result-actions"><span class="ranking-registration-status" id="rankingRegistrationStatus" role="status" aria-live="polite"></span><button class="btn-rank-register" id="btnRankRegister" type="button" disabled>랭킹 참가 등록</button></div>
 </div>
 <div class="result-container">
 <div class="dashboard-grid">
@@ -274,6 +280,8 @@ document.body.append(tooltip);
 
 let busy = false;
 let previousFocus;
+let currentCharacterName = '';
+let rankingRegistrationEnabled = false;
 const FAVORITES_KEY = 'soloa-favorites-v1';
 
 function getFavorites() {
@@ -314,11 +322,23 @@ async function loadRanking() {
   list.replaceChildren(node('li', 'empty-state', '랭킹을 불러오는 중...'));
   try {
     const response = await fetch(`${apiBase}/api/ranking`);
-    const data = await response.json();
-    if (!response.ok || !Array.isArray(data.ranking)) throw new Error();
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !Array.isArray(data.ranking)) {
+      throw new Error(data.message || '랭킹을 불러오지 못했습니다.');
+    }
+    rankingRegistrationEnabled = Boolean(data.registrationEnabled);
+    $('rankingNote').textContent = rankingRegistrationEnabled
+      ? '직접 등록한 캐릭터 중 전투력이 높은 10명입니다.'
+      : '저장소 연결 전입니다. 현재는 기존 조회 기록을 표시합니다.';
+    if (currentCharacterName) {
+      $('btnRankRegister').disabled = !rankingRegistrationEnabled;
+      if (!rankingRegistrationEnabled) {
+        $('rankingRegistrationStatus').textContent = '랭킹 저장소 연결이 필요합니다.';
+      }
+    }
     list.replaceChildren();
     if (!data.ranking.length) {
-      list.append(node('li', 'empty-state', '아직 기록된 캐릭터가 없습니다.'));
+      list.append(node('li', 'empty-state', '아직 랭킹에 등록된 캐릭터가 없습니다.'));
       return;
     }
     for (const row of data.ranking.slice(0, 10)) {
@@ -335,14 +355,38 @@ async function loadRanking() {
       });
       list.append(item);
     }
-  } catch {
-    list.replaceChildren(node('li', 'empty-state', '랭킹을 불러오지 못했습니다.'));
+  } catch (error) {
+    list.replaceChildren(node('li', 'empty-state', error.message || '랭킹을 불러오지 못했습니다.'));
+  }
+}
+
+async function registerRankingCharacter() {
+  const registerButton = $('btnRankRegister');
+  const status = $('rankingRegistrationStatus');
+  if (!currentCharacterName || registerButton.disabled) return;
+  registerButton.disabled = true;
+  status.textContent = '등록 중...';
+  try {
+    const response = await fetch(`${apiBase}/api/ranking/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: currentCharacterName })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || '랭킹 등록에 실패했습니다.');
+    status.textContent = `${data.character.name} 등록 완료`;
+    await loadRanking();
+  } catch (error) {
+    status.textContent = error.message || '랭킹 등록에 실패했습니다.';
+  } finally {
+    registerButton.disabled = !rankingRegistrationEnabled;
   }
 }
 
 favoriteButton.addEventListener('click', toggleFavorite);
 input.addEventListener('input', updateFavoriteButton);
 $('rankingRefresh').addEventListener('click', loadRanking);
+$('btnRankRegister').addEventListener('click', registerRankingCharacter);
 updateFavoriteButton();
 loadRanking();
 
@@ -514,6 +558,11 @@ async function searchCharacter() {
     ) {
       throw new Error('서버 응답에 캐릭터 정보가 없습니다.');
     }
+    currentCharacterName = char.name;
+    $('btnRankRegister').disabled = !rankingRegistrationEnabled;
+    $('rankingRegistrationStatus').textContent = rankingRegistrationEnabled
+      ? ''
+      : '랭킹 저장소 연결이 필요합니다.';
 
     for (const [id, value] of Object.entries({
       resNickname: char.name,
