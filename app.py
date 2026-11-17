@@ -223,6 +223,7 @@ def history_connection():
                 query_started_at TIMESTAMPTZ,
                 query_completed_at TIMESTAMPTZ,
                 source_timestamp TIMESTAMPTZ,
+                equipment_source_timestamp TIMESTAMPTZ,
                 profile_received_at TIMESTAMPTZ,
                 equipment_received_at TIMESTAMPTZ,
                 PRIMARY KEY (server, name, recorded_date)
@@ -234,7 +235,8 @@ def history_connection():
         connection.execute(
             "ALTER TABLE character_history ADD COLUMN IF NOT EXISTS query_completed_at TIMESTAMPTZ"
         )
-        for column in ("source_timestamp", "profile_received_at", "equipment_received_at"):
+        for column in ("source_timestamp", "equipment_source_timestamp",
+                       "profile_received_at", "equipment_received_at"):
             connection.execute(
                 f"ALTER TABLE character_history ADD COLUMN IF NOT EXISTS {column} TIMESTAMPTZ"
             )
@@ -324,8 +326,9 @@ def store_history(char_info, recorded_date):
             """INSERT INTO character_history
                    (name, server, class_name, item_level, combat_power, recorded_date,
                     query_started_at, query_completed_at, source_timestamp,
+                    equipment_source_timestamp,
                     profile_received_at, equipment_received_at)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                ON CONFLICT (server, name, recorded_date) DO UPDATE SET
                    class_name = EXCLUDED.class_name,
                    item_level = EXCLUDED.item_level,
@@ -333,6 +336,7 @@ def store_history(char_info, recorded_date):
                    query_started_at = EXCLUDED.query_started_at,
                    query_completed_at = EXCLUDED.query_completed_at,
                    source_timestamp = EXCLUDED.source_timestamp,
+                   equipment_source_timestamp = EXCLUDED.equipment_source_timestamp,
                    profile_received_at = EXCLUDED.profile_received_at,
                    equipment_received_at = EXCLUDED.equipment_received_at""",
             (char_info["name"], char_info["server"], char_info["className"],
@@ -340,6 +344,7 @@ def store_history(char_info, recorded_date):
              char_info["provenance"]["queryStartedAt"],
              char_info["provenance"]["queryCompletedAt"],
              char_info["provenance"]["sourceTimestamp"],
+             char_info["provenance"]["equipmentSourceTimestamp"],
              char_info["provenance"]["profileResponseReceivedAt"],
              char_info["provenance"]["equipmentResponseReceivedAt"]),
         )
@@ -349,6 +354,7 @@ def store_history(char_info, recorded_date):
                       query_started_at AS "queryStartedAt",
                       query_completed_at AS "queryCompletedAt",
                       source_timestamp AS "sourceTimestamp",
+                      equipment_source_timestamp AS "equipmentSourceTimestamp",
                       profile_received_at AS "profileResponseReceivedAt",
                       equipment_received_at AS "equipmentResponseReceivedAt",
                       recorded_date AS date
@@ -369,6 +375,7 @@ def database_history_row(row):
              "provenance": {
                  "source": "로스트아크 공식 API", "sourceUrl": API_DOCS_URL,
                  "sourceTimestamp": as_kst(row["sourceTimestamp"]),
+                 "equipmentSourceTimestamp": as_kst(row["equipmentSourceTimestamp"]),
                  "profileResponseReceivedAt": as_kst(row["profileResponseReceivedAt"]),
                  "equipmentResponseReceivedAt": as_kst(row["equipmentResponseReceivedAt"]),
                  "queryStartedAt": as_kst(row["queryStartedAt"]),
@@ -427,6 +434,7 @@ def saved_history(char_name):
                           query_started_at AS "queryStartedAt",
                           query_completed_at AS "queryCompletedAt",
                               source_timestamp AS "sourceTimestamp",
+                              equipment_source_timestamp AS "equipmentSourceTimestamp",
                               profile_received_at AS "profileResponseReceivedAt",
                               equipment_received_at AS "equipmentResponseReceivedAt",
                               recorded_date AS date
