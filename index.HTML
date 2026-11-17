@@ -35,12 +35,12 @@ main{flex:1;display:flex;flex-direction:column;align-items:center;justify-conten
 .home-layout main{position:absolute;inset:0;display:flex;width:100%;min-width:0;margin:0;padding:0 20px 12vh;align-items:center;justify-content:center;}
 .favorite-btn{position:absolute;right:62px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--text-sub);font-size:1.7rem;line-height:1;cursor:pointer;padding:8px;border-radius:50%;}
 .favorite-btn:hover,.favorite-btn.active{color:var(--accent-gold);filter:drop-shadow(0 0 8px var(--accent-glow));}
-.ranking-panel{position:absolute;right:clamp(20px,3vw,52px);top:calc(50% - 6vh);transform:translateY(-50%);width:min(320px,25vw);max-height:min(70vh,620px);overflow:auto;padding:20px;}
+.ranking-panel{position:absolute;right:clamp(20px,3vw,52px);top:calc(50% - 6vh);transform:translateY(-50%);width:min(320px,25vw);max-height:min(82vh,760px);overflow:auto;padding:20px;}
 .ranking-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
 .ranking-heading h2{font-size:1.15rem;}
 .ranking-refresh{border:0;background:none;color:var(--text-sub);cursor:pointer;font-size:1.2rem;padding:5px;}
 .ranking-list{list-style:none;display:flex;flex-direction:column;gap:8px;}
-.ranking-item{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:center;padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;border-radius:8px;}
+.ranking-item{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;border-radius:8px;}
 .ranking-item:hover{background:rgba(255,255,255,.05);}
 .ranking-rank{color:var(--accent-gold);font-weight:800;text-align:center;}
 .ranking-name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -156,9 +156,9 @@ body{height:100dvh;min-height:320px}
 </div>
 </main>
 <aside class="panel ranking-panel" aria-labelledby="rankingTitle">
-<div class="ranking-heading"><h2 id="rankingTitle">전체 랭킹</h2><button class="ranking-refresh" id="rankingRefresh" type="button" aria-label="랭킹 새로고침" title="새로고침">↻</button></div>
+<div class="ranking-heading"><h2 id="rankingTitle">전투력 TOP 10</h2><button class="ranking-refresh" id="rankingRefresh" type="button" aria-label="랭킹 새로고침" title="새로고침">↻</button></div>
 <ol class="ranking-list" id="rankingList"><li class="empty-state">랭킹을 불러오는 중...</li></ol>
-<p class="ranking-note" id="rankingNote">검색해 기록된 캐릭터의 최신 전투력 순위입니다.</p>
+<p class="ranking-note" id="rankingNote">검색해 기록된 캐릭터 중 전투력이 높은 10명입니다.</p>
 </aside>
 </div>
 </div>
@@ -321,13 +321,12 @@ async function loadRanking() {
       list.append(node('li', 'empty-state', '아직 기록된 캐릭터가 없습니다.'));
       return;
     }
-    for (const row of data.ranking) {
+    for (const row of data.ranking.slice(0, 10)) {
       const item = node('li', 'ranking-item');
       item.tabIndex = 0;
       item.setAttribute('role', 'button');
       item.append(node('span', 'ranking-rank', row.rank));
       const name = node('span', 'ranking-name', row.name);
-      name.append(node('small', 'ranking-meta', `${row.className} · ${row.server}`));
       item.append(name, node('span', 'ranking-power', format(row.combatPower)));
       const choose = () => { input.value = row.name; updateFavoriteButton(); searchCharacter(); };
       item.addEventListener('click', choose);
