@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>로아 전투력 대시보드</title>
 <style>
-:root{--bg-base:#0B0E14;--bg-gradient:radial-gradient(circle at top,#1A202C 0%,#0B0E14 100%);--panel-bg:rgba(30,35,45,0.6);--text-main:#F8FAFC;--text-sub:#94A3B8;--accent-gold:#D4AF37;--accent-glow:rgba(212,175,55,0.4);--danger-red:#F87171;}
+:root{--bg-base:#0B0E14;--bg-gradient:radial-gradient(ellipse 58% 48% at 50% 30%,rgba(186,198,216,.12) 0%,rgba(118,133,156,.06) 42%,transparent 100%),radial-gradient(ellipse 76% 62% at 50% 0%,rgba(83,99,123,.13) 0%,transparent 72%),radial-gradient(circle at top,#1A202C 0%,#0B0E14 100%);--panel-bg:rgba(30,35,45,0.6);--text-main:#F8FAFC;--text-sub:#94A3B8;--accent-gold:#D4AF37;--accent-glow:rgba(212,175,55,0.4);--danger-red:#F87171;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background-color:var(--bg-base);background-image:var(--bg-gradient);color:var(--text-main);font-family:'Pretendard',-apple-system,BlinkMacSystemFont,system-ui,Roboto,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;position:relative;}
 body::before{content:"";position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");pointer-events:none;z-index:0;}
@@ -23,7 +23,7 @@ header{display:flex;justify-content:space-between;align-items:flex-start;padding
 main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 20px;margin-top:-8vh;}
 .search-container{width:100%;max-width:680px;text-align:center;}
 .search-title{font-size:2.2rem;font-weight:700;margin-bottom:40px;letter-spacing:-1px;}
-.search-title span{font-family:Georgia,'Times New Roman',serif;font-weight:800;letter-spacing:.04em;color:#f8e7a0;background:linear-gradient(180deg,#fff9d9 0%,#f7df91 18%,#fff3bf 30%,#c58b2a 52%,#f4d77d 68%,#8d5b1c 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 1px 0 rgba(255,245,190,.9)) drop-shadow(0 2px 0 #80531d) drop-shadow(0 0 8px rgba(255,207,83,.75)) drop-shadow(0 0 22px rgba(212,160,48,.55));}
+.search-title span{font-family:Georgia,'Times New Roman',serif;font-weight:800;letter-spacing:.04em;color:#f8e7a0;background:linear-gradient(180deg,#fff9d9 0%,#f7df91 18%,#fff3bf 30%,#c58b2a 52%,#f4d77d 68%,#8d5b1c 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 1px 0 rgba(255,245,190,.9)) drop-shadow(0 2px 0 #80531d);}
 .search-box{position:relative;width:100%;margin-bottom:25px;}
 .search-box input{width:100%;padding:22px 112px 22px 35px;font-size:1.25rem;background-color:var(--panel-bg);border:1px solid rgba(255,255,255,0.1);border-radius:50px;color:var(--text-main);outline:none;transition:all 0.4s cubic-bezier(0.4,0,0.2,1);box-shadow:inset 0 2px 4px rgba(0,0,0,0.3),0 10px 30px rgba(0,0,0,0.5);backdrop-filter:blur(10px);}
 .search-box input::placeholder{color:#64748B;}
