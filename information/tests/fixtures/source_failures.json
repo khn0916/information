@@ -1,0 +1,17 @@
+{
+  "http": {
+    "401": "source_unauthorized",
+    "403": "source_forbidden",
+    "404": "character_not_found",
+    "429": "source_rate_limited",
+    "500": "source_server_error"
+  },
+  "network": {
+    "timeout": "source_timeout",
+    "offline": "source_unavailable",
+    "invalid_json": "source_invalid_json"
+  },
+  "schema": {
+    "missing_combat_power": "source_schema_changed"
+  }
+}

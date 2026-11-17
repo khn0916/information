@@ -1,0 +1,6 @@
+flask
+flask-cors
+requests
+psycopg[binary]>=3.2,<4
+gunicorn; sys_platform != "win32"
+waitress; sys_platform == "win32"
