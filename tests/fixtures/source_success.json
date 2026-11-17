@@ -1,0 +1,11 @@
+{
+  "profile": {
+    "CharacterName": "시험용캐릭터",
+    "ServerName": "시험서버",
+    "CharacterClassName": "시험직업",
+    "ItemAvgLevel": "1,700.00",
+    "CombatPower": "1,234.56",
+    "Title": "시험칭호"
+  },
+  "equipment": []
+}
