@@ -20,7 +20,9 @@ log = app.logger
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_FILE = Path(os.getenv("LOA_DATA_FILE", BASE_DIR / "loa_data.json"))
+HISTORY_SEED_FILE = BASE_DIR / "history_seed.json"
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+RANKING_REGISTRATION_ENABLED = os.getenv("ENABLE_RANKING_REGISTRATION", "").lower() == "true"
 API_URL = "https://developer-lostark.game.onstove.com/armories/characters/{}/{}"
 TIMEOUT = (5, 15)
 
@@ -64,6 +66,8 @@ def load_env_file():
 
 
 load_env_file()
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+RANKING_REGISTRATION_ENABLED = os.getenv("ENABLE_RANKING_REGISTRATION", "").lower() == "true"
 
 
 class ApiError(Exception):
@@ -104,17 +108,34 @@ def request_loa(char_name, endpoint):
 
 
 def load_data():
-    try:
-        with DATA_FILE.open(encoding="utf-8") as file:
-            data = json.load(file)
-        if not isinstance(data, dict):
-            raise ValueError("root must be an object")
-        return data
-    except FileNotFoundError:
-        return {}
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
-        log.exception("Unable to read data file %s", DATA_FILE)
-        raise ApiError("기록 파일을 읽지 못했습니다. 파일을 확인해주세요.", 500) from exc
+    merged = {}
+    for path in (HISTORY_SEED_FILE, DATA_FILE):
+        try:
+            with path.open(encoding="utf-8-sig") as file:
+                source = json.load(file)
+            if not isinstance(source, dict):
+                raise ValueError("root must be an object")
+        except FileNotFoundError:
+            continue
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            log.exception("Unable to read data file %s", path)
+            raise ApiError("기록 파일을 읽지 못했습니다. 파일을 확인해주세요.", 500) from exc
+
+        for name, rows in source.items():
+            if not isinstance(rows, list):
+                continue
+            by_date = {
+                str(row.get("date")): row
+                for row in merged.get(name, [])
+                if isinstance(row, dict) and row.get("date")
+            }
+            by_date.update({
+                str(row.get("date")): row
+                for row in rows
+                if isinstance(row, dict) and row.get("date")
+            })
+            merged[name] = [by_date[key] for key in sorted(by_date)]
+    return merged
 
 
 def save_data(data):
@@ -136,6 +157,78 @@ def save_data(data):
     finally:
         if temp_path and temp_path.exists():
             temp_path.unlink(missing_ok=True)
+
+
+def history_connection():
+    if not DATABASE_URL:
+        raise ApiError("전투력 기록 저장소 연결이 필요합니다.", 503)
+    connection = None
+    try:
+        connection = psycopg.connect(
+            DATABASE_URL, row_factory=dict_row, connect_timeout=10
+        )
+        connection.execute(
+            """CREATE TABLE IF NOT EXISTS character_history (
+                name TEXT NOT NULL,
+                server TEXT NOT NULL,
+                class_name TEXT NOT NULL,
+                item_level DOUBLE PRECISION NOT NULL DEFAULT 0,
+                combat_power DOUBLE PRECISION NOT NULL CHECK (combat_power >= 0),
+                recorded_date DATE NOT NULL,
+                PRIMARY KEY (server, name, recorded_date)
+            )"""
+        )
+        connection.execute(
+            """CREATE TABLE IF NOT EXISTS app_migrations (
+                migration_name TEXT PRIMARY KEY,
+                completed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )"""
+        )
+        migrated = connection.execute(
+            "SELECT 1 FROM app_migrations WHERE migration_name = %s",
+            ("import_character_history_v1",),
+        ).fetchone()
+        if not migrated:
+            for query_name, rows in load_data().items():
+                if not isinstance(rows, list):
+                    continue
+                for row in rows:
+                    if not isinstance(row, dict):
+                        continue
+                    try:
+                        recorded_date = datetime.strptime(
+                            str(row.get("date", ""))[:10], "%Y-%m-%d"
+                        ).date()
+                        combat_power = float(row.get("combatPower"))
+                        item_level = float(row.get("itemLevel") or 0)
+                    except (TypeError, ValueError):
+                        continue
+                    if combat_power < 0 or item_level < 0:
+                        continue
+                    connection.execute(
+                        """INSERT INTO character_history
+                               (name, server, class_name, item_level, combat_power, recorded_date)
+                           VALUES (%s, %s, %s, %s, %s, %s)
+                           ON CONFLICT (server, name, recorded_date) DO NOTHING""",
+                        (
+                            str(row.get("name") or query_name),
+                            str(row.get("server") or "알 수 없음"),
+                            str(row.get("className") or "알 수 없음"),
+                            item_level,
+                            combat_power,
+                            recorded_date,
+                        ),
+                    )
+            connection.execute(
+                "INSERT INTO app_migrations (migration_name) VALUES (%s)",
+                ("import_character_history_v1",),
+            )
+        return connection
+    except psycopg.Error as exc:
+        if connection is not None:
+            connection.close()
+        log.exception("Unable to connect to the character history database")
+        raise ApiError("전투력 기록 저장소에 연결하지 못했습니다.", 503) from exc
 
 
 def ranking_connection():
@@ -163,6 +256,30 @@ def ranking_connection():
             connection.close()
         log.exception("Unable to connect to the ranking database")
         raise ApiError("랭킹 저장소에 연결하지 못했습니다.", 503) from exc
+
+
+def store_history(char_info, recorded_date):
+    with history_connection() as connection:
+        connection.execute(
+            """INSERT INTO character_history
+                   (name, server, class_name, item_level, combat_power, recorded_date)
+               VALUES (%s, %s, %s, %s, %s, %s)
+               ON CONFLICT (server, name, recorded_date) DO UPDATE SET
+                   class_name = EXCLUDED.class_name,
+                   item_level = EXCLUDED.item_level,
+                   combat_power = EXCLUDED.combat_power""",
+            (char_info["name"], char_info["server"], char_info["className"],
+             char_info["itemLevel"], char_info["combatPower"], recorded_date),
+        )
+        rows = connection.execute(
+            """SELECT name, server, class_name AS "className",
+                      item_level AS "itemLevel", combat_power AS "combatPower",
+                      recorded_date AS date
+               FROM character_history WHERE server = %s AND name = %s
+               ORDER BY recorded_date""",
+            (char_info["server"], char_info["name"]),
+        ).fetchall()
+    return [{**row, "date": row["date"].isoformat()} for row in rows]
 
 
 def search_history_ranking():
@@ -194,6 +311,17 @@ def search_history_ranking():
     return ranking
 
 
+def database_history_ranking():
+    with history_connection() as connection:
+        return connection.execute(
+            """SELECT DISTINCT ON (server, name)
+                      name, server, class_name AS "className",
+                      combat_power AS "combatPower"
+               FROM character_history
+               ORDER BY server, name, recorded_date DESC"""
+        ).fetchall()
+
+
 @app.get("/api/search")
 def search_character():
     char_name = request.args.get("name", "").strip()
@@ -223,24 +351,28 @@ def search_character():
         "equipment": equipment if isinstance(equipment, list) else [],
     }
 
-    data = load_data()
-    history = data.get(char_name, [])
-    if not isinstance(history, list):
-        raise ApiError("캐릭터 기록 형식이 올바르지 않습니다.", 500)
-    previous = [row for row in history if isinstance(row, dict) and row.get("date", "") < today]
     entry = {**char_info, "date": today}
-    today_index = next(
-        (i for i, row in enumerate(history)
-         if isinstance(row, dict) and row.get("date") == today), None
-    )
-    if today_index is None:
-        history.append(entry)
+    if DATABASE_URL:
+        history = store_history(char_info, now.date())
+        previous = [row for row in history if row["date"] < today]
+        yesterday_power = previous[-1]["combatPower"] if previous else None
     else:
-        history[today_index] = entry
-    data[char_name] = history
-    save_data(data)
-
-    yesterday_power = max(previous, key=lambda row: row["date"], default={}).get("combatPower")
+        data = load_data()
+        history = data.get(char_name, [])
+        if not isinstance(history, list):
+            raise ApiError("캐릭터 기록 형식이 올바르지 않습니다.", 500)
+        previous = [row for row in history if isinstance(row, dict) and row.get("date", "") < today]
+        today_index = next(
+            (i for i, row in enumerate(history)
+             if isinstance(row, dict) and row.get("date") == today), None
+        )
+        if today_index is None:
+            history.append(entry)
+        else:
+            history[today_index] = entry
+        data[char_name] = history
+        save_data(data)
+        yesterday_power = max(previous, key=lambda row: row["date"], default={}).get("combatPower")
     return jsonify({
         "status": 200, "character": char_info,
         "yesterdayPower": yesterday_power, "history": history,
@@ -249,30 +381,45 @@ def search_character():
 
 @app.get("/api/ranking")
 def character_ranking():
-    if not DATABASE_URL:
+    if DATABASE_URL and not RANKING_REGISTRATION_ENABLED:
+        try:
+            ranking = database_history_ranking()
+        except psycopg.Error as exc:
+            log.exception("Unable to load character history ranking")
+            raise ApiError("랭킹을 불러오지 못했습니다.", 503) from exc
+        ranking.sort(key=lambda row: row["combatPower"], reverse=True)
+        ranking = ranking[:10]
+        registration_enabled = False
+    elif not DATABASE_URL:
         return jsonify({
             "status": 200,
             "ranking": search_history_ranking(),
             "registrationEnabled": False,
+            "historyPersistent": False,
         })
-    try:
-        with ranking_connection() as connection:
-            ranking = connection.execute(
-                """SELECT name, server, class_name AS \"className\", combat_power AS \"combatPower\"
-                   FROM ranking_characters
-                   ORDER BY combat_power DESC, name ASC
-                   LIMIT 10"""
-            ).fetchall()
-    except psycopg.Error as exc:
-        log.exception("Unable to load character ranking")
-        raise ApiError("랭킹을 불러오지 못했습니다.", 503) from exc
+    else:
+        try:
+            with ranking_connection() as connection:
+                ranking = connection.execute(
+                    """SELECT name, server, class_name AS \"className\", combat_power AS \"combatPower\"
+                       FROM ranking_characters
+                       ORDER BY combat_power DESC, name ASC LIMIT 10"""
+                ).fetchall()
+        except psycopg.Error as exc:
+            log.exception("Unable to load character ranking")
+            raise ApiError("랭킹을 불러오지 못했습니다.", 503) from exc
+        registration_enabled = True
     for rank, row in enumerate(ranking, 1):
         row["rank"] = rank
-    return jsonify({"status": 200, "ranking": ranking, "registrationEnabled": True})
+    return jsonify({"status": 200, "ranking": ranking,
+                    "registrationEnabled": registration_enabled,
+                    "historyPersistent": True})
 
 
 @app.post("/api/ranking/register")
 def register_ranking_character():
+    if not RANKING_REGISTRATION_ENABLED:
+        raise ApiError("랭킹 참가 등록 기능이 꺼져 있습니다.", 403)
     payload = request.get_json(silent=True) or {}
     if not isinstance(payload, dict):
         raise ApiError("캐릭터 이름을 확인해주세요.", 400)
